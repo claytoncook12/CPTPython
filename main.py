@@ -250,6 +250,20 @@ def diss_data_dict(file):
 
         return r
 
+def u0_to_water_table_depth(u0,depth,depth_unit,return_unit=None):
+    'Convert u0 in kPa to depth of water table in meters or feet'
+    
+    if depth_unit != 'ft' and depth_unit != 'm':
+        raise ValueError("unit must be type ft or m")
+    
+    depth_water_m = u0 / 9.81
+    if depth_unit == 'm':
+        if return_unit == 'ft':
+        	return convert(depth - depth_water_m,"m","ft")
+        return depth - depth_water_m
+    if depth_unit == 'ft':
+        return depth - convert(depth_water_m,"m","ft")
+
 def plot(data,depth,title,
          square_time=False,u0=None,
          ui=None,uf=None,tf=None):
