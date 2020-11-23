@@ -16,6 +16,11 @@ def convert(number,fromvalue,tovalue):
     if fromvalue == "m":
         if tovalue == "ft":
             return number * 3.28084
+
+    # Convert Ft to Meters
+    if fromvalue == "ft":
+    	if tovalue == "m":
+    		return number / 3.28084
     
     # Convert MPa
     if fromvalue == "MPa":
