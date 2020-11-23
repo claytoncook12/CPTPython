@@ -264,7 +264,7 @@ def u0_to_water_table_depth(u0,depth,depth_unit,return_unit=None):
     if depth_unit == 'ft':
         return depth - convert(depth_water_m,"m","ft")
 
-def plot(data,depth,title,
+def plot_diss(data,depth,title,
          square_time=False,u0=None,
          ui=None,uf=None,tf=None):
     'Plot Dissipation Data From diss_data_dict function'
