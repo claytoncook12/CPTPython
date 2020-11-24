@@ -34,6 +34,20 @@ def convert(number,fromvalue,tovalue):
     # Return if no values found for converting
     return "NOTCONVERTED"
 
+def double_list(l):
+    l_new = []
+    for x in l:
+        l_new.append(x)
+        l_new.append(x)
+    return l_new
+
+def layers_double(l):
+    l_new = [0]
+    for x in l[:-1]:
+        l_new.append(x)
+        l_new.append(x)
+    l_new.append(l[-1])
+    return l_new
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
@@ -313,6 +327,112 @@ def plot_diss(data,depth,title,
     
     # Plotting legend
     plt.legend(bbox_to_anchor=(1,1), loc="upper left")
+    
+    return plt.show()
+
+def plot_push(depth,qc,fs,u2,
+              title,figsize=(12,12),depth_unit='m',
+              u0_start_m=None,
+              int_dict=None):
+    'Plot Push CPT data'
+    
+    fig = plt.figure(figsize=figsize)
+    fig.patch.set_facecolor('white')
+    
+    # Add Title
+    fig.suptitle(title)
+    
+    # Add subplots
+    if int_dict == None:
+    	ax1 = fig.add_subplot(1,3,1)
+    	ax2 = fig.add_subplot(1,3,2)
+    	ax3 = fig.add_subplot(1,3,3)
+    else:
+    	ax1 = fig.add_subplot(1,4,1)
+    	ax2 = fig.add_subplot(1,4,2)
+    	ax3 = fig.add_subplot(1,4,3)
+    	ax4 = fig.add_subplot(1,4,4)
+    
+    # Depth in feet
+    if depth_unit == 'ft':
+        depth = [convert(x,'m','ft') for x in depth]
+        ax1.set_ylabel('depth [ft]')
+    if depth_unit == 'm':
+        ax1.set_ylabel('depth [m]')
+        
+    # Plot Subplots
+    # qc
+    ax1.plot(qc,depth, label='qc [MPa]', color='red')
+    ax1.xaxis.tick_top()
+    ax1.xaxis.set_label_position('top')
+    ax1.set_xlabel('qc [MPa]')
+    ax1.grid(True,linestyle='--')
+    ax1.plot([5,5],[depth[0],depth[-1]], label='5 MPa (Clay/Sand ROT)', linestyle='--', color='#bf77f6')
+    
+    # fs
+    ax2.plot(fs,depth, label='fs [MPa]', color='green')
+    ax2.xaxis.tick_top()
+    ax2.xaxis.set_label_position('top')
+    ax2.set_xlabel('fs [MPa]')
+    ax2.grid(True,linestyle='--')
+    
+    # u2
+    ax3.plot(u2,depth, label='u2 [MPa]', color='blue')
+    ax3.xaxis.tick_top()
+    ax3.xaxis.set_label_position('top')
+    ax3.set_xlabel('u2 [MPa]')
+    ax3.grid(True,linestyle='--')
+    
+    # u0
+    if u0_start_m != None:
+        if depth_unit == 'm':
+            final_u0_pressure_MPa = (depth[-1] - u0_start_m) * 0.00981
+            ax3.plot([0,final_u0_pressure_MPa],[u0_start_m,depth[-1]],
+                     label='u0 (Final {:.1f} kPa)'.format(final_u0_pressure_MPa*1000),
+                    linestyle='--', color='#75bbfd', marker="v")
+        if depth_unit == 'ft':
+            final_u0_pressure_MPa = (convert(depth[-1],'ft','m') - u0_start_m) * 0.00981
+            ax3.plot([0,final_u0_pressure_MPa],[convert(u0_start_m,'m','ft'),depth[-1]],
+                     label='u0 (Final {:.1f} kPa)'.format(final_u0_pressure_MPa*1000),
+                     linestyle='--', color='#75bbfd', marker="v")
+    
+    # Interpreted layers
+    if int_dict != None:
+    	# qc interpreted layers
+    	layers_plot = layers_double(int_dict['layers [m]'])
+    	qc_plot = double_list(int_dict['qc [MPa] int'])
+    	if depth_unit == 'ft':
+    		layers_plot = [convert(x,'m','ft') for x in layers_plot]
+    	ax1.plot(qc_plot,layers_plot, label='qc [MPa] int', color='#f97306', linestyle=':')
+
+    	# fs interpreted layers
+    	fs_plot = double_list(int_dict['fs [MPa] int'])
+    	ax2.plot (fs_plot,layers_plot, label='fs [MPa] int', color='#f97306', linestyle=':')
+
+    	# layers interpretation plot
+    	ax4.plot([0,0],[0,depth[-1]], label='Interpreted \nLayers', color='#f97306', linestyle=':')
+    	ax4.xaxis.tick_top()
+    	ax4.xaxis.set_label_position('top')
+    	ax4.set_xlabel('Interpreted \nLayers')
+    	ax4.grid(True,linestyle='--')
+
+    # Invert y axis
+    ax1.invert_yaxis()
+    ax2.invert_yaxis()
+    ax3.invert_yaxis()
+    if int_dict != None:
+    	ax4.invert_yaxis() 
+    
+    # Plotting x legends
+    leg_bot_x, leg_bot_y = 0, -0.01
+    ax1.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
+    ax2.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
+    ax3.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
+    if int_dict != None:
+    	ax4.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
+    
+    # Adjust Title Location
+    plt.subplots_adjust(bottom=0, top=.91)
     
     return plt.show()
 
