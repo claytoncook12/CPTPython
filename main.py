@@ -410,11 +410,36 @@ def plot_push(depth,qc,fs,u2,
     	ax2.plot (fs_plot,layers_plot, label='fs [MPa] int', color='#f97306', linestyle=':')
 
     	# layers interpretation plot
-    	ax4.plot([0,0],[0,depth[-1]], label='Interpreted \nLayers', color='#f97306', linestyle=':')
+    	if depth_unit == 'm':
+    		layers_borders = [0] + int_dict['layers [m]']
+    	if depth_unit == 'ft':
+    		layers_borders = [0] + [convert(x,'m','ft') for x in int_dict['layers [m]']]
+    	# Add layer lines
+    	for layer in layers_borders:
+    		ax4.plot([0,1],[layer,layer], color='#f97306', linestyle=':')
+    	# Add layer text
+    	layer_names = int_dict['layer name']
+    	for i, name in enumerate(layer_names):
+    		if depth_unit == 'm':
+	    		ax4.text(0,(layers_borders[i]+layers_borders[i+1])/2,
+	    			'{}\n{:.3f} to {:.3f} m\nqc [MPa] int: {}\nfs [MPa] int: {}'.format(name,
+	    											layers_borders[i],
+	    											layers_borders[i+1],
+	    				                            int_dict['qc [MPa] int'][i],
+	    				                            int_dict['fs [MPa] int'][i]),
+	    			verticalalignment='center')
+	    	if depth_unit == 'ft':
+	    		ax4.text(0,(layers_borders[i]+layers_borders[i+1])/2,
+	    			'{}\n{:.1f} to {:.1f} ft\nqc [MPa] int: {}\nfs [MPa] int: {}'.format(name,
+	    											layers_borders[i],
+	    											layers_borders[i+1],
+	    				                            int_dict['qc [MPa] int'][i],
+	    				                            int_dict['fs [MPa] int'][i]),
+	    			verticalalignment='center')
     	ax4.xaxis.tick_top()
     	ax4.xaxis.set_label_position('top')
     	ax4.set_xlabel('Interpreted \nLayers')
-    	ax4.grid(True,linestyle='--')
+    	ax4.get_xaxis().set_ticks([])
 
     # Invert y axis
     ax1.invert_yaxis()
@@ -428,8 +453,6 @@ def plot_push(depth,qc,fs,u2,
     ax1.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
     ax2.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
     ax3.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
-    if int_dict != None:
-    	ax4.legend(loc="upper left",bbox_to_anchor=(leg_bot_x, leg_bot_y))
     
     # Adjust Title Location
     plt.subplots_adjust(bottom=0, top=.91)
