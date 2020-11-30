@@ -6,30 +6,63 @@ import os
 import csv
 import getopt
 import re
+import math
 import matplotlib.pyplot as plt
 
-def convert(number,fromvalue,tovalue):
-    # Converts number from one value to another
+def convert(number,from_value,to_value):
+    """
+    Convert value from one unit to another.
+
+    Parameters
+    ----------
+        number (float): number to be converted
+        from_value (str): current unit. Can be 'm', 'ft', 'MPa', 'psi', 'psf', 'kN/m3'
+        to_value (str): unit that you want to convert too
+
+    Returns
+    -------
+        float: value of convert number. Will return "NOTCONVERTED" if from_value
+            and to_value value is not in current convert list
+    """
     number = float(number)
     
     # Convert Meters
-    if fromvalue == "m":
-        if tovalue == "ft":
+    if from_value == "m":
+        if to_value == "ft":
             return number * 3.28084
 
     # Convert Ft to Meters
-    if fromvalue == "ft":
-    	if tovalue == "m":
+    if from_value == "ft":
+    	if to_value == "m":
     		return number / 3.28084
     
     # Convert MPa
-    if fromvalue == "MPa":
-        if tovalue == "psf":
+    if from_value == "MPa":
+        if to_value == "psf":
             return number * 20885.46
-        elif tovalue == "ksf":
+        elif to_value == "ksf":
             return number * 20.88546
-        elif tovalue == "tsf":
+        elif to_value == "tsf":
             return number * 10.44273
+        elif to_value == 'kPa':
+            return number * 1000
+
+    # Convert psi
+    if from_value == "psi":
+        if to_value == "kPa":
+            return number * 6.895
+        if to_value == "MPa":
+            return number * 0.006895
+
+    # Convert psf
+    if from_value == "psf":
+        if to_value == "psi":
+            return number * 0.006944
+
+    # Convert unit weight
+    if from_value == 'kN/m3':
+        if to_value == 'psf':
+            return number * 6.423114
     
     # Return if no values found for converting
     return "NOTCONVERTED"
@@ -48,6 +81,119 @@ def layers_double(l):
         l_new.append(x)
     l_new.append(l[-1])
     return l_new
+
+def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
+    """
+    Calculates the total unit weight of the soil
+    based on sleeve friction.
+
+    The method is based on the work in Mayne (2014)
+    Keynote: Interpretation of geotechnical parameters 
+    from seismic piezocone tests. Proceedings, 3rd Intl.
+    Symp. on Cone Penetration Testing, 47-73.
+    
+    Parameters
+    ----------
+        fs (float): sleeve friction reading
+        fs_units (str): units of sleeve friction readings,
+            can be "kPa","MPa", or "psi".
+        weight_return_units (str, optional): units of
+            total unit weight to be returned,
+            can be "kN/m3" or "pcf"
+            will default to "kN/m3"
+
+    Returns
+    -------
+        float: total unit weight in unit given in
+            weight_return_units
+    """
+
+    atm = 100 # kPa
+    gamma_water = 9.807 # kN/m3
+
+    # Convert fs to kPa for equation calculation
+    if fs_units == 'kPa':
+        pass
+    elif fs_units == 'MPa':
+        fs = convert(fs, 'MPa', 'kPa')
+    elif fs_units == 'psi':
+        fs = convert(fs, 'psi', 'kPa')
+    else:
+        ValueError('fs_units need to be either kPa, MPa, or psi')
+    
+    # Calculate total unit weight in kN/m3
+    gamma_total = gamma_water * (1.22 + 0.15 * math.log(100*(fs/atm) + 0.01))
+
+    # Convert gamma_total to weight_return_units_specified
+    if weight_return_units == 'kN/m3':
+        pass
+    if weight_return_units == 'psf':
+        gamma_total = convert(gamma_total, 'kN/m3', 'psf')
+
+    return gamma_total
+
+def corrected_cone_resistance(qc,u2,a=0.8):
+    """
+    Calculates the corrected cone resistance (qt).
+
+    Values of qc and u2 should be in the same presure unit as
+    the return value will be in the same pressure unit. 
+
+    Parameters
+    ----------
+        qc (float): cone resistance as measured
+        u2 (float): pore pressure as measured
+        a (float, optional): the net area ratio determined from laboratory calibration
+            with a typical value between 0.70 and 0.85
+    
+    Returns
+    -------
+        float: corrected cone resistance
+    
+    Notes
+    -----
+    The correction is from Campanella, R.G., Gillespie, D., and Robertson, P.K., 1982. Pore pressures 
+    during cone penetration testing. In Proceedings of the 2nd European Symposium on Penetration Testing,
+    ESPOT II. Amsterdam. A.A. Balkema, pp. 507-512.
+
+    In sandy soils qc == qt
+    """
+    return qc + u2 * (1 - a)
+    
+def effective_overburden_pressure(soil_total_unit_weight,depth,depth_below_water_table=0,
+above_pressure=0, units='metric'):
+    """
+    Calculates effective overburden pressure at depth specificed in ground. If total effective 
+    overburden pressure is needed, just leave depth_below_water_table as default.
+
+    The units can either be input in 'metric' or 'english'. The default is set
+    to use metric units.
+
+    Metric units: kN/m3, m, kN/m2
+
+    English units: pcf, ft, psf
+
+    Parameters
+    ----------
+        soil_total_unit_weight (float): total soil unit weight (kN/m3 or psf)
+        depth (float): depth in soil layer (m or ft)
+        depth_below_water_table (float, optional): depth of point below water table depth (m or ft)
+            Default = 0
+        above_pressure (float, optional): pressure to add above current layer (kN/m2 or psf)
+            Default = 0
+        units (str, optional): either 'metric' or 'english'
+            Default = 'metric' 
+
+    Returns
+    -------
+        float: effective overburden pressure at current ground depth
+    """
+    if units == 'metric':
+        return (above_pressure + soil_total_unit_weight * depth) - (depth_below_water_table * 9.81)
+    elif units == 'english':
+        return (above_pressure + soil_total_unit_weight * depth) - (depth_below_water_table * 62.4)
+    else:
+        ValueError("units must be 'metric' or 'english'")
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
