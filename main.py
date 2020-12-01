@@ -164,6 +164,7 @@ def corrected_cone_resistance(qc,u2,a=0.8):
         u2 (float): pore pressure as measured
         a (float, optional): the net area ratio determined from laboratory calibration
             with a typical value between 0.70 and 0.85
+            Default=0.8
     
     Returns
     -------
