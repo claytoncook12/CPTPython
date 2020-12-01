@@ -87,10 +87,7 @@ def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     Calculates the total unit weight of the soil
     based on sleeve friction.
 
-    The method is based on the work in Mayne (2014)
-    Keynote: Interpretation of geotechnical parameters 
-    from seismic piezocone tests. Proceedings, 3rd Intl.
-    Symp. on Cone Penetration Testing, 47-73.
+    The method is based on the work in Mayne (2014).
     
     Parameters
     ----------
@@ -106,6 +103,12 @@ def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     -------
         float: total unit weight in unit given in
             weight_return_units
+
+    Notes
+    -----
+    Mayne (2014) Keynote: Interpretation of geotechnical parameters 
+    from seismic piezocone tests. Proceedings, 3rd Intl.
+    Symp. on Cone Penetration Testing, 47-73.
     """
 
     atm = 100 # kPa
@@ -119,7 +122,7 @@ def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     elif fs_units == 'psi':
         fs = convert(fs, 'psi', 'kPa')
     else:
-        ValueError('fs_units need to be either kPa, MPa, or psi')
+        raise ValueError('fs_units need to be either kPa, MPa, or psi')
     
     # Calculate total unit weight in kN/m3
     gamma_total = gamma_water * (1.22 + 0.15 * math.log(100*(fs/atm) + 0.01))
@@ -193,7 +196,27 @@ above_pressure=0, units='metric'):
     elif units == 'english':
         return (above_pressure + soil_total_unit_weight * depth) - (depth_below_water_table * 62.4)
     else:
-        ValueError("units must be 'metric' or 'english'")
+        raise ValueError("units must be 'metric' or 'english'")
+
+def normalized_friction_ratio(fs,qt,sigma_vo):
+    """
+    Calculate normalized friction ratio, in %.
+    
+    Units must be consistant on input of fs, qt, sigma_vo. In
+    Typically either in kN/m2 or psf for all three values.
+
+    Parameters
+    ----------
+        fs (float): sleeve friction reading
+        qt (float): corrected cone resistance
+        sigma_vo (float): total overburden pressure at current ground depth
+
+    Returns
+    -------
+        float: Normalized Sleeve Friction in percent  
+    """
+    return 100 * ((fs)/(qt - sigma_vo))
+
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
