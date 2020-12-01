@@ -82,6 +82,22 @@ def layers_double(l):
     l_new.append(l[-1])
     return l_new
 
+def percentage_diff(v1,v2):
+    """
+    Calculates the percent difference between two numbers
+
+    Parameters
+    ----------
+        v1 (float): value one
+        v2 (float): value two
+
+    Returns
+    -------
+        float: percent difference
+    """
+
+    return (abs(v1 - v2))/((v1 + v2)/2)*100
+
 def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     """
     Calculates the total unit weight of the soil
@@ -217,6 +233,70 @@ def normalized_friction_ratio(fs,qt,sigma_vo):
     """
     return 100 * ((fs)/(qt - sigma_vo))
 
+def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric'):
+    """
+    Calculates value of CPT Material Index (Ic) with given inputs. Uses an iterative
+    process to calcuate Ic, n, and Qtn.
+
+    If units =  'metric': values should be in MPa
+       units = 'english': values should be in psi
+
+    Parameters
+    ----------
+        qt (float): corrected cone resistance
+        sigma_vo (float): total overburden pressure at point
+        sigma_prime_vo (float): effective overburden pressure at point
+        Fr (float): normalized friction ratio, in %
+        n (float, optional): soil-type dependent exponent value that is used to
+            start and measure convergence
+            Default=1.0
+            typical values are clay(n~=1), silts(n~=0.75), and sands(n~=0.5)
+        units (str): whether units given are in 'metric' or 'english'
+
+    Returns
+    -------
+        float: CPT Material Index (Ic) at convergence
+        float: Qtn value at convergence
+        float: n exponent value at convergence
+
+    Raises
+    ------
+        ValueError
+            will be raise if calculated n value is above 1.0
+
+    Notes
+    -----
+    Robertson, P.K., 2010a. Soil behaviour type from the CPT: an update. 2nd
+    International Symposium on Cone Penetration Testing, CPT’10,
+    Huntington Beach, CA, USA.
+    """
+    # Setting atmospheric pressure based on units
+    if units == 'metric': # MPa
+        sigma_atm = 0.101325
+    elif units == 'english': # psi
+        sigma_atm = 14.5
+    else:
+        raise ValueError("units must be in 'metric' or 'english'")
+
+    # Equation for Q_tn
+    Q_tn = ((qt - sigma_vo)/sigma_atm)/(sigma_prime_vo/sigma_atm)**n
+
+    # Equation Ic
+    Ic = ((3.47 - math.log10(Q_tn))**2 + (1.22 + math.log10(Fr))**2)**0.5
+
+    # Equation for calculated n
+    n_cal = 0.381 * Ic + 0.05*(sigma_prime_vo/sigma_atm) - 0.15
+    
+    # Check if n value has converged
+    # difference bewtween n needs to be less than 0.1%
+    if percentage_diff(n,n_cal) >= 0.1:
+        return cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=n_cal,units=units)
+    else:
+        # Check to make sure n <= 1
+        if n > 1.0:
+            raise ValueError("Calculation error. Value of n converged to be greater than 1.\nn = {}".format(n))
+        else:
+            return Ic, n, Q_tn
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
