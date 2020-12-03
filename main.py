@@ -53,6 +53,8 @@ def convert(number,from_value,to_value):
     if from_value == 'kPa':
         if to_value == 'MPa':
             return number / 1000
+        if to_value == 'psi':
+            return number * 0.145038
 
     # Convert psi
     if from_value == "psi":
@@ -72,7 +74,20 @@ def convert(number,from_value,to_value):
     if from_value == 'kN/m3':
         if to_value == 'pcf':
             return number * 6.423114
-    
+    if from_value == 'pcf':
+        if to_value == 'kN/m3':
+            return number / 6.423114
+
+    # Convert m/s
+    if from_value == 'm/s':
+        if to_value == 'ft/s':
+            return number * 3.28084
+
+    # Convert ft/s
+    if from_value == 'ft/s':
+        if to_value == 'm/s':
+            return number / 3.28084
+
     # Return if no values found for converting
     return "NOTCONVERTED"
 
@@ -389,6 +404,74 @@ def SBTn_zone(Fr,Q_tn):
         return SBT_type[6][0], SBT_type[6][1]
     
     raise ValueError("Parameters did not yeild Soil Behavioral Type classification.")
+
+def estimated_undrained_shear_strength(qt,simga_vo,N_kt=12.0):
+    """
+    Calculates an estimated undrained shear strenght from corrected cone resistance
+    and total overburden pressure for soft to stiff clays.
+
+    Parameters
+    ----------
+        qt (float): corrected cone resistance
+        simga_vo (float): total overburden pressure
+        N_kt (float, optional): bearing factor
+            Default: 12.0
+    
+    Returns
+    -------
+        float: estimated undrained shear strength
+            return untis will be the units given for qt and simga_vo
+    """
+
+    return (qt - simga_vo)/N_kt
+
+def estimated_shear_wave_velocity(qt,fs):
+    """
+    Estimate of shear wave velocity (m/s) of a soil from CPTu collected data. qs and fs
+    need to be input in units of kPa.
+
+    Parameters
+    ----------
+        qt (float): corrected cone resistance, kPa
+        fs (float): sleeve friction reading, kPa
+    
+    Return
+    ------
+        float: estimated shear wave velocity in (m/s)
+    """
+    return (10.1 * math.log10(qt) - 11.4)**(1.67) * (100 * (fs/qt))**(0.3)
+
+def estimated_small_strain_shear_modulus(soil_total_unit_weight,shear_wave_velocity,units='metric'):
+    """
+    Estimated small strain shear modulus (G_max). Graphically it is the beginning portion
+    of all stress-strain-strength curves for geomaterials.
+
+    Parameters
+    ----------
+        soil_total_unit_weight (float): total soil unit weight
+        shear_wave_velocity (float): shear wave velovity
+        units (str): units used if 'metric' (kN/m3 and m/s)
+        or 'english' (pcf and ft/s)
+            Default='metric'
+
+    Returns
+    -------
+        float: estimated small strain shear modulus (G_max)
+    """
+
+    # accelerated of gravity to use
+    if units == 'metric':
+        ga = 9.81 # m/sec2
+    elif units == 'english':
+        ga = 32.2 # ft/sec2
+    else:
+        raise ValueError("soil units must be 'metric' or 'english'")
+    
+    # Calculate Density
+    density = soil_total_unit_weight / ga
+
+    # Return estimated small strain shear modulus (G_max)
+    return density * (shear_wave_velocity)**2
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
