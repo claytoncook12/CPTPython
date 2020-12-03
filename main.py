@@ -40,19 +40,28 @@ def convert(number,from_value,to_value):
     if from_value == "MPa":
         if to_value == "psf":
             return number * 20885.46
-        elif to_value == "ksf":
+        if to_value == "ksf":
             return number * 20.88546
-        elif to_value == "tsf":
+        if to_value == "tsf":
             return number * 10.44273
-        elif to_value == 'kPa':
+        if to_value == 'kPa':
             return number * 1000
+        if to_value == 'psi':
+            return number * 145.038
+
+    # Convert kPa
+    if from_value == 'kPa':
+        if to_value == 'MPa':
+            return number / 1000
 
     # Convert psi
     if from_value == "psi":
         if to_value == "kPa":
-            return number * 6.895
+            return number * 6.894757
         if to_value == "MPa":
             return number * 0.006895
+        if to_value == "psf":
+            return number * 144
 
     # Convert psf
     if from_value == "psf":
@@ -61,7 +70,7 @@ def convert(number,from_value,to_value):
 
     # Convert unit weight
     if from_value == 'kN/m3':
-        if to_value == 'psf':
+        if to_value == 'pcf':
             return number * 6.423114
     
     # Return if no values found for converting
@@ -127,7 +136,7 @@ def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     Symp. on Cone Penetration Testing, 47-73.
     """
 
-    atm = 100 # kPa
+    atm = 101.325 # kPa
     gamma_water = 9.807 # kN/m3
 
     # Convert fs to kPa for equation calculation
@@ -143,11 +152,9 @@ def soil_weight_est(fs,fs_units,weight_return_units='kN/m3'):
     # Calculate total unit weight in kN/m3
     gamma_total = gamma_water * (1.22 + 0.15 * math.log(100*(fs/atm) + 0.01))
 
-    # Convert gamma_total to weight_return_units_specified
-    if weight_return_units == 'kN/m3':
-        pass
-    if weight_return_units == 'psf':
-        gamma_total = convert(gamma_total, 'kN/m3', 'psf')
+    # Convert gamma_total to weight_return_units_specified if needed
+    if weight_return_units == 'pcf':
+        return convert(gamma_total, 'kN/m3', 'pcf')
 
     return gamma_total
 
@@ -172,15 +179,15 @@ def corrected_cone_resistance(qc,u2,a=0.8):
     
     Notes
     -----
-    The correction is from Campanella, R.G., Gillespie, D., and Robertson, P.K., 1982. Pore pressures 
-    during cone penetration testing. In Proceedings of the 2nd European Symposium on Penetration Testing,
-    ESPOT II. Amsterdam. A.A. Balkema, pp. 507-512.
+        The correction is from Campanella, R.G., Gillespie, D., and Robertson, P.K., 1982. Pore pressures 
+        during cone penetration testing. In Proceedings of the 2nd European Symposium on Penetration Testing,
+        ESPOT II. Amsterdam. A.A. Balkema, pp. 507-512.
 
     In sandy soils qc == qt
     """
     return qc + u2 * (1 - a)
     
-def effective_overburden_pressure(soil_total_unit_weight,depth,depth_below_water_table=0,
+def effective_overburden_pressure(soil_total_unit_weight,depth_in_layer,depth_below_water_table=0,
 above_pressure=0, units='metric'):
     """
     Calculates effective overburden pressure at depth specificed in ground. If total effective 
@@ -196,7 +203,7 @@ above_pressure=0, units='metric'):
     Parameters
     ----------
         soil_total_unit_weight (float): total soil unit weight (kN/m3 or psf)
-        depth (float): depth in soil layer (m or ft)
+        depth_in_layer (float): depth in soil layer (m or ft)
         depth_below_water_table (float, optional): depth of point below water table depth (m or ft)
             Default = 0
         above_pressure (float, optional): pressure to add above current layer (kN/m2 or psf)
@@ -209,9 +216,9 @@ above_pressure=0, units='metric'):
         float: effective overburden pressure at current ground depth
     """
     if units == 'metric':
-        return (above_pressure + soil_total_unit_weight * depth) - (depth_below_water_table * 9.81)
+        return (above_pressure + soil_total_unit_weight * depth_in_layer) - (depth_below_water_table * 9.81)
     elif units == 'english':
-        return (above_pressure + soil_total_unit_weight * depth) - (depth_below_water_table * 62.4)
+        return (above_pressure + soil_total_unit_weight * depth_in_layer) - (depth_below_water_table * 62.4)
     else:
         raise ValueError("units must be 'metric' or 'english'")
 
@@ -234,7 +241,7 @@ def normalized_friction_ratio(fs,qt,sigma_vo):
     """
     return 100 * ((fs)/(qt - sigma_vo))
 
-def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric'):
+def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric',n_override=False):
     """
     Calculates value of CPT Material Index (Ic) with given inputs. Uses an iterative
     process to calcuate Ic, n, and Qtn.
@@ -253,12 +260,14 @@ def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric'):
             Default=1.0
             typical values are clay(n~=1), silts(n~=0.75), and sands(n~=0.5)
         units (str): whether units given are in 'metric' or 'english'
+        n_override (bool): does not use iterate and return first run through
+            of parameters calculation
 
     Returns
     -------
         float: CPT Material Index (Ic) at convergence
-        float: Qtn value at convergence
         float: n exponent value at convergence
+        float: Q_tn value at convergence
 
     Raises
     ------
@@ -267,15 +276,15 @@ def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric'):
 
     Notes
     -----
-    Robertson, P.K., 2010a. Soil behaviour type from the CPT: an update. 2nd
-    International Symposium on Cone Penetration Testing, CPT’10,
-    Huntington Beach, CA, USA.
+        Robertson, P.K., 2010. Soil behaviour type from the CPT: an update. 2nd
+        International Symposium on Cone Penetration Testing, CPT’10,
+        Huntington Beach, CA, USA.
     """
     # Setting atmospheric pressure based on units
-    if units == 'metric': # MPa
-        sigma_atm = 0.101325
-    elif units == 'english': # psi
-        sigma_atm = 14.5
+    if units == 'metric':
+        sigma_atm = 0.101325 # MPa
+    elif units == 'english':
+        sigma_atm = 14.69 # psi
     else:
         raise ValueError("units must be in 'metric' or 'english'")
 
@@ -288,16 +297,98 @@ def cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=1.0,units='metric'):
     # Equation for calculated n
     n_cal = 0.381 * Ic + 0.05*(sigma_prime_vo/sigma_atm) - 0.15
     
+    # If n_override is active
+    if n_override == True:
+        return Q_tn, Ic, n
+
     # Check if n value has converged
     # difference bewtween n needs to be less than 0.1%
     if percentage_diff(n,n_cal) >= 0.1:
         return cpt_material_index(qt,sigma_vo,sigma_prime_vo,Fr,n=n_cal,units=units)
     else:
-        # Check to make sure n <= 1
+        # Check n <= 1
         if n > 1.0:
             raise ValueError("Calculation error. Value of n converged to be greater than 1.\nn = {}".format(n))
         else:
-            return Ic, n, Q_tn
+            return Q_tn, Ic, n
+
+def SBTn_zone(Fr,Q_tn):
+    """
+    Calculates Soil Behavioral Type (SBTn) from normalized CPT material index properties.
+
+    Parameters
+    ----------
+        Fr (float): normalized friction ratio, in %
+        Q_tn (float): parameter from CPT material index calculation
+    
+    Return
+    ------
+        str: Soil Behavioral Type Zone
+        str: Soil Behavioral Type Discription
+
+    Raises
+    ------
+        ValueError
+            0.1 < Fr < 10
+            1 < Q_tn < 1000
+
+    Notes
+    -----
+        Robertson, P.K. (2009). Cone penetration testing: a unified approach.
+        Canadian Geotechnical J., 46 (11), 1337-1355.
+    """
+    
+    # Soil Behavioral Types
+    SBT_type = [
+        ["Zone 1", "Sensitive Clays and Silts"],
+        ["Zone 2", "Organic Soils"],
+        ["Zone 3", "Clays"],
+        ["Zone 4", "Silt Mix"],
+        ["Zone 5", "Sandy Mixtures"],
+        ["Zone 6", "Sands"],
+        ["Zone 7", "Gravelly Sands"],
+        ["Zone 8", "Very Stiff OC sand to clayey sand"],
+        ["Zone 9", "Very Stiff OC clay to silt"]
+    ]
+
+    # Check Values are within limits of zones of Fr and Q_tn
+    if Fr < 0.1 or Fr > 10:
+        raise ValueError('Fr is {}\nNeeds to be between 0.1 and 10'.format(Fr))
+    if Q_tn < 1 or Q_tn > 1000:
+        raise ValueError('Q_tn is {}\nNeeds to be between 1 and 1000'.format(Q_tn))
+    
+    # Equation Ic
+    Ic = ((3.47 - math.log10(Q_tn))**2 + (1.22 + math.log10(Fr))**2)**0.5
+
+    # Zone 1
+    if Q_tn < (12 * math.exp(-1.4 * Fr)):
+        return SBT_type[0][0], SBT_type[0][1]
+    # Zone 8 and 9
+    if Q_tn > (1 / (0.005*(Fr - 1) - 0.0003*(Fr - 1)**2 - 0.002)):
+        if Fr > 4.5:
+            return SBT_type[8][0], SBT_type[8][1]
+        if Fr > 1.5 and Fr < 4.5:
+            return SBT_type[7][0], SBT_type[7][1]
+    # Zone 2
+    if Ic >= 3.60:
+        return SBT_type[1][0], SBT_type[1][1]
+    # Zone 3
+    if Ic >= 2.95 and Ic < 3.60:
+        return SBT_type[2][0], SBT_type[2][1]
+    # Zone 4
+    if Ic >= 2.60 and Ic < 2.95:
+        return SBT_type[3][0], SBT_type[3][1]
+    # Zone 5
+    if Ic >= 2.05 and Ic < 2.60:
+        return SBT_type[4][0], SBT_type[4][1]
+    # Zone 6
+    if Ic >= 1.31 and Ic < 2.05:
+        return SBT_type[5][0], SBT_type[5][1]
+    # Zone 7
+    if Ic < 1.31:
+        return SBT_type[6][0], SBT_type[6][1]
+    
+    raise ValueError("Parameters did not yeild Soil Behavioral Type classification.")
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
@@ -580,11 +671,39 @@ def plot_diss(data,depth,title,
     
     return plt.show()
 
-def plot_push(depth,qc,fs,u2,
+def plot_push(depth,q,fs,u2,
               title,figsize=(12,12),depth_unit='m',
               u0_start_m=None,
+              q_corrected=True,
               int_dict=None):
-    'Plot Push CPT data'
+    """
+    Plots a matplotlib graph with depth, q, fs, and u2
+
+    Parameters
+    ----------
+        depth (list): values of depth below ground in 'm' or 'ft'
+        q (list): values of cone tip resistance either corrected (qt) or not corrected (qc)
+            in 'MPa'
+        u2 (list): values of pore pressure readings
+            in 'MPa'
+        title (str): title of graph
+        figsize (tuple): size of figure that will be created
+            Default: (12,12)
+        depth_unit (str): depth measured unit
+            can be either 'm' or 'ft'
+            Default: 'm'
+        u0_start_m (float): depth of water table below ground in meters, if left as default
+            it will not plot
+            Default: None
+        q_corrected (bool): if given q values are corrected for pore pressure
+            Default: True
+        int_dict (dict): interpreted layers dict with keys of 'layer name', 'layer [m]',
+            q [MPa] int', and 'fs [MPa] int'
+
+    Returns
+    -------
+        matplotlib.pyplot.show(): Matplotlib graph of plotted values
+    """
     
     fig = plt.figure(figsize=figsize)
     fig.patch.set_facecolor('white')
@@ -611,11 +730,15 @@ def plot_push(depth,qc,fs,u2,
         ax1.set_ylabel('depth [m]')
         
     # Plot Subplots
-    # qc
-    ax1.plot(qc,depth, label='qc [MPa]', color='red')
+    # qt or qc plot
+    if q_corrected:
+        ax1.plot(q,depth, label='qt [MPa]', color='red')
+        ax1.set_xlabel('qt [MPa]')
+    else:
+        ax1.plot(q,depth, label='qc [MPa]', color='red')
+        ax1.set_xlabel('qc [MPa]')
     ax1.xaxis.tick_top()
     ax1.xaxis.set_label_position('top')
-    ax1.set_xlabel('qc [MPa]')
     ax1.grid(True,linestyle='--')
     ax1.plot([5,5],[depth[0],depth[-1]], label='5 MPa (Clay/Sand ROT)', linestyle='--', color='#bf77f6')
     
@@ -650,10 +773,10 @@ def plot_push(depth,qc,fs,u2,
     if int_dict != None:
     	# qc interpreted layers
     	layers_plot = layers_double(int_dict['layers [m]'])
-    	qc_plot = double_list(int_dict['qc [MPa] int'])
+    	qc_plot = double_list(int_dict['q [MPa] int'])
     	if depth_unit == 'ft':
     		layers_plot = [convert(x,'m','ft') for x in layers_plot]
-    	ax1.plot(qc_plot,layers_plot, label='qc [MPa] int', color='#f97306', linestyle=':')
+    	ax1.plot(qc_plot,layers_plot, label='q [MPa] int', color='#f97306', linestyle=':')
 
     	# fs interpreted layers
     	fs_plot = double_list(int_dict['fs [MPa] int'])
@@ -672,18 +795,18 @@ def plot_push(depth,qc,fs,u2,
     	for i, name in enumerate(layer_names):
     		if depth_unit == 'm':
 	    		ax4.text(0,(layers_borders[i]+layers_borders[i+1])/2,
-	    			'{}\n{:.3f} to {:.3f} m\nqc [MPa] int: {}\nfs [MPa] int: {}'.format(name,
+	    			'{}\n{:.3f} to {:.3f} m\nq [MPa] int: {}\nfs [MPa] int: {}'.format(name,
 	    											layers_borders[i],
 	    											layers_borders[i+1],
-	    				                            int_dict['qc [MPa] int'][i],
+	    				                            int_dict['q [MPa] int'][i],
 	    				                            int_dict['fs [MPa] int'][i]),
 	    			verticalalignment='center')
 	    	if depth_unit == 'ft':
 	    		ax4.text(0,(layers_borders[i]+layers_borders[i+1])/2,
-	    			'{}\n{:.1f} to {:.1f} ft\nqc [MPa] int: {}\nfs [MPa] int: {}'.format(name,
+	    			'{}\n{:.1f} to {:.1f} ft\nq [MPa] int: {}\nfs [MPa] int: {}'.format(name,
 	    											layers_borders[i],
 	    											layers_borders[i+1],
-	    				                            int_dict['qc [MPa] int'][i],
+	    				                            int_dict['q [MPa] int'][i],
 	    				                            int_dict['fs [MPa] int'][i]),
 	    			verticalalignment='center')
     	ax4.xaxis.tick_top()
