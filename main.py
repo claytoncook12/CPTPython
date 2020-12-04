@@ -89,7 +89,8 @@ def convert(number,from_value,to_value):
             return number / 3.28084
 
     # Return if no values found for converting
-    return "NOTCONVERTED"
+    raise ValueError("from_value {} or to_value {} not in\
+        convertable units".format(to_value,from_value))
 
 def double_list(l):
     l_new = []
@@ -472,6 +473,55 @@ def estimated_small_strain_shear_modulus(soil_total_unit_weight,shear_wave_veloc
 
     # Return estimated small strain shear modulus (G_max)
     return density * (shear_wave_velocity)**2
+
+def undrained_rigidity_index(G_max, S_u):
+    """
+    Calculates rigidity index of a soil (unitless).
+
+    Units for G_max and Su must be consistant.
+
+    Parameters
+    ----------
+        G_max (float): small strain shear modulus
+        S_u (float): undrained shear strength
+
+    Returns
+    -------
+        float: rigidity index of the soil
+    """
+
+    return G_max / S_u
+
+def estimated_coefficient_of_consolidation(t_50,I_R,cone_size='10 cm2'):
+    """
+    Calculates the estimated coefficient of consolidation of a soil from cone penetration
+    data
+
+    Parameters
+    ----------
+        t_50 (float): time in seconds to reach 50% dissipation
+        I_R (float): undrained rigidity index (unitless)
+        cone_size (str): size of cone in cm2
+            Value can be '10 cm2' or '15 cm2'
+            Default = '10 cm2'
+
+    Returns
+    -------
+        float: estimated coefficient of consoidation in cm/sec
+    """
+
+    # Set penetrometer radius from cone size used
+    if cone_size == '10 cm2':
+        a_c = 1.78 #cm
+    elif cone_size == '15 cm2':
+        a_c = 2.20 #cm
+    else:
+        raise ValueError('Cone size "{}" not in avalable values:'.format(cone_size))
+    
+    # Calculate coefficient of consolidation in cm/sec
+    c_v = (0.030 * a_c**2 * I_R**0.75)/t_50
+
+    return c_v 
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
