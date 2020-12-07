@@ -87,6 +87,13 @@ def convert(number,from_value,to_value):
     if from_value == 'ft/s':
         if to_value == 'm/s':
             return number / 3.28084
+        if to_value == 'ft/day':
+            return number * 86400
+    
+    # Convert cm/sec
+    if from_value == 'cm/s':
+        if to_value == 'ft/min':
+            return number * 1.9685
 
     # Return if no values found for converting
     raise ValueError("from_value {} or to_value {} not in\
@@ -522,6 +529,23 @@ def estimated_coefficient_of_consolidation(t_50,I_R,cone_size='10 cm2'):
     c_v = (0.030 * a_c**2 * I_R**0.75)/t_50
 
     return c_v 
+
+def estimated_hydraulic_conductivity(t50):
+    """ 
+    A approach for calculating k (cm/s) developed for soft normally-consolidated
+    clay from t50 from CPT dissipation testing
+
+    Parameters
+    ----------
+        t50 (float): time in seconds for 50 percent of dissipation in CPT dissipation
+        testing
+        
+    Returns
+    -------
+        float: estimated hydraulic conductivity in cm/s 
+    """
+
+    return (1/(251*t50))**1.25
 
 def convert_cpt_csv(file):
     # Converts csv files with cpt data
