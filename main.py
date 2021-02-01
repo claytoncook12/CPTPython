@@ -55,6 +55,8 @@ def convert(number,from_value,to_value):
             return number / 1000
         if to_value == 'psi':
             return number * 0.145038
+        if to_value == "psf":
+            return number * 20.885434 
 
     # Convert psi
     if from_value == "psi":
